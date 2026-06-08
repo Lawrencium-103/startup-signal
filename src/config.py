@@ -5,6 +5,7 @@ from typing import Optional
 
 @dataclass
 class Config:
+    apify_api_key: Optional[str] = None
     apollo_api_key: Optional[str] = None
     openai_api_key: Optional[str] = None
     groq_api_key: Optional[str] = None
@@ -28,6 +29,7 @@ class Config:
     @classmethod
     def from_env(cls):
         return cls(
+            apify_api_key=os.getenv("APIFY_API_KEY"),
             apollo_api_key=os.getenv("APOLLO_API_KEY"),
             openai_api_key=os.getenv("OPENAI_API_KEY"),
             groq_api_key=os.getenv("GROQ_API_KEY"),

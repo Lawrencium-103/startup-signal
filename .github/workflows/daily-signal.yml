@@ -42,7 +42,8 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
-          APOLLO_API_KEY: ${{ secrets.APOLLO_API_KEY }}
+           APIFY_API_KEY: ${{ secrets.APIFY_API_KEY }}
+           APOLLO_API_KEY: ${{ secrets.APOLLO_API_KEY }}
           PRODUCTHUNT_API_KEY: ${{ secrets.PRODUCTHUNT_API_KEY }}
           CRUNCHBASE_API_KEY: ${{ secrets.CRUNCHBASE_API_KEY }}
         run: python run.py
