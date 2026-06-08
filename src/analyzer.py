@@ -69,8 +69,8 @@ Rules:
 Respond with ONLY a JSON object:
 {{
   "score": <0-100 integer>,
-  "reason": "<6-8 word specific reason>",
-  "critical_need": "<8-12 word specific need that matches my skills>"
+  "reason": "<6-8 word reason>",
+  "critical_need": "<what they specifically need right now — e.g., 'needs a sales dashboard to track pipeline metrics' or 'needs automated data pipeline from crm to analytics'>"
 }}"""
 
 def _build_match_prompt(startup: Dict) -> str:

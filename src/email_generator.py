@@ -16,23 +16,23 @@ def _generate_single(startup: Dict) -> str:
     founder = startup.get("founder_name")
     name = startup.get("name", "your startup")
     need = startup.get("critical_need") or ""
-    reason = startup.get("match_reason") or ""
-    first_name = founder.split()[0] if founder else "there"
+    desc = startup.get("description", "") or ""
 
-    if need and reason:
-        body = (
-            f"Hi {first_name},\n\n"
-            f"Saw {name} — {need.lower().rstrip('.')}.\n\n"
-            f"That's exactly what I do. I build dashboards, automate workflows, and set up AI tools "
-            f"for early-stage startups. "
-            f"Would you be open to a quick call this week?"
-        )
+    if founder:
+        first_name = founder.split()[0]
     else:
-        body = (
-            f"Hi {first_name},\n\n"
-            f"Saw {name} and think I could help. I build dashboards (Tableau, Power BI), "
-            f"automate workflows (n8n), and create internal AI tools for startups.\n\n"
-            f"Open to a quick chat?"
-        )
+        first_name = name
+
+    # Build a specific hook from the description
+    hook = need.lower().rstrip(".")
+    if not hook and desc:
+        hook = desc[:80].lower().rstrip(".")
+
+    body = (
+        f"Hi {first_name},\n\n"
+        f"Saw {name} — {hook}.\n\n"
+        f"I build dashboards, automate workflows, and create AI tools for early-stage startups. "
+        f"Want to hop on a quick call to see if I can help?"
+    )
 
     return body
