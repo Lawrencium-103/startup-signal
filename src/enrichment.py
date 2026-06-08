@@ -76,7 +76,7 @@ def _run_google_search(query: str, cfg) -> Optional[Dict[str, Optional[str]]]:
         return None
 
     if resp.status_code != 201:
-        log.info(f"Apify run start failed: {resp.status_code} {resp.text[:100]}")
+        log.info(f"Apify run start failed ({resp.status_code}): {resp.text[:500]}")
         return None
 
     run_id = resp.json()["data"]["id"]
