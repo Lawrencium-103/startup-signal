@@ -2,6 +2,7 @@ import logging
 import re
 import time
 import random
+from datetime import date
 from typing import List, Dict
 from urllib.parse import urlparse
 
@@ -18,6 +19,8 @@ SCRAPERS = [
     ("Crunchbase", "src.scrapers.crunchbase"),
     ("Startup Gallery", "src.scrapers.startup_gallery"),
 ]
+
+TODAY = date.today().isoformat()
 
 
 def import_scraper(path: str):
@@ -68,6 +71,9 @@ def run_all_scrapers(cfg) -> List[Dict[str, str]]:
         try:
             scraper_fn = import_scraper(module_path)
             results = scraper_fn(cfg)
+            for s in results:
+                s["source"] = name
+                s["extracted_at"] = TODAY
             log.info(f"{name}: found {len(results)} startups")
             all_startups.extend(results)
         except Exception as e:

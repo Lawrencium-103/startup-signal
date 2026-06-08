@@ -7,9 +7,9 @@ from typing import List, Dict
 log = logging.getLogger(__name__)
 
 
-def build_html_report(startups: List[Dict]) -> str:
+def build_html_report(top_startups: List[Dict], all_startups: List[Dict] = None) -> str:
     rows = ""
-    for i, s in enumerate(startups, 1):
+    for i, s in enumerate(top_startups, 1):
         name = s.get("name", "Unknown")
         founder = s.get("founder_name") or "Not found"
         email = s.get("founder_email") or "Not found"
@@ -39,12 +39,51 @@ def build_html_report(startups: List[Dict]) -> str:
             </td>
         </tr>"""
 
+    all_rows = ""
+    if all_startups:
+        for s in all_startups:
+            n = s.get("name", "")
+            u = (s.get("url") or "").strip()
+            src = s.get("source", "")
+            dt = s.get("extracted_at", "")
+            desc_short = (s.get("description") or "")[:100]
+            link = f'<a href="{u}" target="_blank">{u}</a>' if u else "—"
+            all_rows += f"""
+        <tr>
+            <td style="padding:8px;border-bottom:1px solid #eee;font-size:13px;">{n}</td>
+            <td style="padding:8px;border-bottom:1px solid #eee;font-size:13px;">{link}</td>
+            <td style="padding:8px;border-bottom:1px solid #eee;font-size:13px;color:#666;">{desc_short}</td>
+            <td style="padding:8px;border-bottom:1px solid #eee;font-size:13px;color:#666;">{src}</td>
+            <td style="padding:8px;border-bottom:1px solid #eee;font-size:13px;color:#666;">{dt}</td>
+        </tr>"""
+
+    all_section = ""
+    if all_startups and all_rows:
+        count = len(all_startups)
+        all_section = f"""
+    <h2 style="color:#111;margin-top:40px;">All Startups ({count})</h2>
+    <p style="color:#666;">Full dataset from all scrapers. <a href="startups.csv">Download CSV</a></p>
+    <div style="max-height:500px;overflow-y:auto;border:1px solid #ddd;border-radius:4px;">
+    <table style="width:100%;border-collapse:collapse;">
+        <thead>
+            <tr style="background:#f5f5f5;position:sticky;top:0;">
+                <th style="padding:8px;text-align:left;border-bottom:2px solid #ddd;font-size:13px;">Name</th>
+                <th style="padding:8px;text-align:left;border-bottom:2px solid #ddd;font-size:13px;">URL</th>
+                <th style="padding:8px;text-align:left;border-bottom:2px solid #ddd;font-size:13px;">Description</th>
+                <th style="padding:8px;text-align:left;border-bottom:2px solid #ddd;font-size:13px;">Source</th>
+                <th style="padding:8px;text-align:left;border-bottom:2px solid #ddd;font-size:13px;">Date</th>
+            </tr>
+        </thead>
+        <tbody>{all_rows}</tbody>
+    </table>
+    </div>"""
+
     html = f"""<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:900px;margin:0 auto;padding:20px;">
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:960px;margin:0 auto;padding:20px;">
     <h1 style="color:#111;">Startup Signal</h1>
-    <p style="color:#666;">Top {len(startups)} matches for your skills today</p>
+    <p style="color:#666;">Top {len(top_startups)} matches for your skills today</p>
     <table style="width:100%;border-collapse:collapse;margin-top:16px;">
         <thead>
             <tr style="background:#f5f5f5;">
@@ -57,6 +96,7 @@ def build_html_report(startups: List[Dict]) -> str:
         </thead>
         <tbody>{rows}</tbody>
     </table>
+    {all_section}
     <p style="color:#999;font-size:12px;margin-top:20px;">
         Startup Signal — Review each email before sending. No automated outreach.
     </p>
@@ -65,12 +105,12 @@ def build_html_report(startups: List[Dict]) -> str:
     return html
 
 
-def send_report(startups: List[Dict], cfg) -> bool:
+def send_report(startups: List[Dict], cfg, all_startups: List[Dict] = None) -> bool:
     if not startups:
         log.info("No startups to report")
         return False
 
-    html = build_html_report(startups)
+    html = build_html_report(startups, all_startups)
 
     if not cfg.email_to or not cfg.smtp_password:
         log.warning("Email not configured. Top matches:")

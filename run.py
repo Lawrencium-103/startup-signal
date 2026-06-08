@@ -40,7 +40,10 @@ def main():
     enriched = enrich_startups(top5, cfg)
     finalized = generate_emails(enriched)
 
-    html = build_html_report(finalized)
+    from src.history import merge_and_save
+    merge_and_save(all_startups, "reports/startups.csv")
+
+    html = build_html_report(finalized, all_startups)
     out_dir = Path("reports")
     out_dir.mkdir(exist_ok=True)
     report_path = out_dir / "index.html"
@@ -51,7 +54,7 @@ def main():
     dated_path = out_dir / f"report-{date.today().isoformat()}.html"
     dated_path.write_text(html, encoding="utf-8")
 
-    send_report(finalized, cfg)
+    send_report(finalized, cfg, all_startups)
 
     log.info("Done. Happy hunting!")
 
