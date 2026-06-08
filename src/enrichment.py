@@ -1,4 +1,5 @@
 import logging
+import re
 import requests
 import time
 from typing import List, Dict, Optional
@@ -23,13 +24,28 @@ def enrich_startups(startups: List[Dict[str, str]], cfg) -> List[Dict[str, Optio
     return enriched
 
 
-def enrich_single(startup: Dict[str, str], cfg) -> Dict[str, Optional[str]]:
-    domain = urlparse(startup.get("url", "")).netloc or ""
-    if not domain:
-        log.debug(f"No domain for {startup.get('name')}, trying name search")
-        return _search_by_name(startup, cfg)
+def _extract_domain(startup: Dict[str, str]) -> Optional[str]:
+    raw = startup.get("url", "") or ""
+    domain = urlparse(raw).netloc or ""
+    known_platforms = {"producthunt.com", "betalist.com", "techcrunch.com",
+                       "www.producthunt.com", "feeds.feedburner.com"}
+    if domain and domain not in known_platforms:
+        return domain
 
-    return _search_by_domain(startup, domain, cfg)
+    desc = startup.get("description", "") or ""
+    urls = re.findall(r'https?://(?:www\.)?([a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.[a-z]{2,}(?:\.[a-z]{2,})?)', desc, re.I)
+    for u in urls:
+        if u not in known_platforms and u.count(".") <= 3:
+            return u
+    return None
+
+
+def enrich_single(startup: Dict[str, str], cfg) -> Dict[str, Optional[str]]:
+    domain = _extract_domain(startup)
+    if domain:
+        return _search_by_domain(startup, domain, cfg)
+    log.debug(f"No valid domain for {startup.get('name')}, trying name search")
+    return _search_by_name(startup, cfg)
 
 
 def _search_by_domain(startup: Dict[str, str], domain: str, cfg) -> Dict[str, Optional[str]]:
