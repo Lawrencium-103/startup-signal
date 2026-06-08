@@ -17,6 +17,17 @@ I am a data associate with expertise in:
 - Other: Data entry automation, business process automation, CRM integration
 """
 
+BIG_COMPANIES = [
+    "openai", "google", "meta", "facebook", "apple", "amazon", "microsoft",
+    "netflix", "spotify", "uber", "airbnb", "twitter", "x corp", "linkedin",
+    "salesforce", "oracle", "sap", "ibm", "intel", "cisco", "adobe",
+    "tesla", "spacex", "stripe", "square", "shopify", "hubspot",
+    "datadog", "snowflake", "mongodb", "cloudflare", "twilio",
+    "coinbase", "robinhood", "palantir", "zoom", "slack", "notion",
+    "figma", "canva", "atlassian", "github", "gitlab", "docker",
+    "reddit", "pinterest", "snap", "dropbox", "doordash",
+]
+
 KEYWORD_SCORE = {
     "data": 3, "analytics": 3, "dashboard": 5, "tableau": 5, "power bi": 5,
     "looker": 4, "google data studio": 4, "metric": 3, "kpi": 3,
@@ -40,7 +51,7 @@ def keyword_score(description: str) -> int:
             score += points
     return score
 
-MATCH_PROMPT = """You are a matchmaking analyst. Given a startup and my skill profile, rate how well I can help them.
+MATCH_PROMPT = """You are a matchmaking analyst. Rate how well this early-stage startup needs my skills.
 
 My Skills:
 {skills}
@@ -49,11 +60,17 @@ Startup: {name}
 Description: {description}
 Website: {url}
 
+Rules:
+- Score HIGH (70-100) if they are an early-stage startup that clearly needs data dashboards, automation, AI tools, or analytics
+- Score MEDIUM (40-69) if there's some relevance but unclear need
+- Score LOW (0-39) if they are big/established, not a startup, or don't need my skills
+- Penalize big companies. Only early-stage startups are good targets.
+
 Respond with ONLY a JSON object:
 {{
   "score": <0-100 integer>,
-  "reason": "<one sentence why I'm a good fit, mentioning specific skill>",
-  "critical_need": "<one sentence about what they critically need that matches my skills>"
+  "reason": "<6-8 word specific reason>",
+  "critical_need": "<8-12 word specific need that matches my skills>"
 }}"""
 
 def _build_match_prompt(startup: Dict) -> str:
@@ -72,6 +89,18 @@ def analyze_startups(startups: List[Dict], cfg) -> List[Dict]:
             s["match_reason"] = "keyword match"
             s["critical_need"] = ""
         return sorted(startups, key=lambda x: x.get("match_score", 0), reverse=True)
+
+    filtered = []
+    for s in startups:
+        name = (s.get("name") or "").lower().strip()
+        desc = (s.get("description") or "").lower()
+        combined = f"{name} {desc}"
+        if any(big in combined for big in BIG_COMPANIES):
+            log.info(f"Filtered out: {s.get('name')}")
+            continue
+        filtered.append(s)
+    log.info(f"Filtered {len(startups) - len(filtered)}/{len(startups)} big companies")
+    startups = filtered
 
     for s in startups:
         s["match_score"] = keyword_score(s.get("description", ""))
