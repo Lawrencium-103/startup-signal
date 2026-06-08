@@ -39,7 +39,7 @@ def main():
     html = build_html_report(emails)
     out_dir = Path("reports")
     out_dir.mkdir(exist_ok=True)
-    report_path = out_dir / "latest.html"
+    report_path = out_dir / "index.html"
     report_path.write_text(html, encoding="utf-8")
     log.info(f"Report saved to {report_path}")
 
