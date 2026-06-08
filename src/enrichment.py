@@ -76,6 +76,7 @@ def _run_google_search(query: str, cfg) -> Optional[Dict[str, Optional[str]]]:
     run_id = resp.json()["data"]["id"]
     log.debug(f"Apify run {run_id} started for: {query}")
 
+    dataset_id = None
     for _ in range(30):
         time.sleep(2)
         status_resp = requests.get(
@@ -84,32 +85,42 @@ def _run_google_search(query: str, cfg) -> Optional[Dict[str, Optional[str]]]:
         )
         if status_resp.status_code != 200:
             continue
-        status = status_resp.json()["data"]["status"]
+        data = status_resp.json()["data"]
+        status = data["status"]
         if status == "SUCCEEDED":
+            dataset_id = data.get("defaultDatasetId")
             break
         if status in ("FAILED", "ABORTED", "TIMED-OUT"):
-            log.debug(f"Apify run {run_id} {status}")
+            log.info(f"Apify run {run_id} {status}: {data.get('errorMessage','')}")
             return None
     else:
-        log.debug(f"Apify run {run_id} timed out waiting")
+        log.info(f"Apify run {run_id} timed out waiting")
+        return None
+
+    if not dataset_id:
+        log.info(f"Apify: no dataset for run {run_id}")
         return None
 
     dataset_resp = requests.get(
-        f"{APIFY_BASE}/acts/{GOOGLE_SEARCH_ACTOR}/runs/{run_id}/dataset/items",
+        f"{APIFY_BASE}/datasets/{dataset_id}/items",
         headers={"Authorization": f"Bearer {cfg.apify_api_key}"},
     )
     if dataset_resp.status_code != 200:
-        log.debug(f"Apify dataset fetch failed: {dataset_resp.status_code}")
+        log.info(f"Apify dataset fetch failed: {dataset_resp.status_code}")
         return None
 
     items = dataset_resp.json()
-    if not items:
-        log.debug(f"Apify: empty dataset for {query}")
+    if not items or (isinstance(items, dict) and "error" in items):
+        log.info(f"Apify: empty or error dataset for {query}: {items if isinstance(items, dict) else 'empty'}")
+        return None
+
+    if isinstance(items, dict):
+        log.info(f"Apify: unexpected dataset format for {query}: {list(items.keys())}")
         return None
 
     result = _parse_google_results(items, query)
     if not result:
-        log.debug(f"Apify: no founder parsed for {query} (got {len(items)} result items)")
+        log.info(f"Apify: no founder parsed for {query} (got {len(items)} result items)")
     return result
 
 
