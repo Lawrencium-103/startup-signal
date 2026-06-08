@@ -48,7 +48,7 @@ def _search_apify(startup: Dict[str, str], cfg) -> Dict[str, Optional[str]]:
     try:
         result = _run_google_search(name, cfg)
         if result:
-            return result
+            return {**startup, **result}
     except Exception as e:
         log.warning(f"Apify search failed for {name}: {e}")
 
