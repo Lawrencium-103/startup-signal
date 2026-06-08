@@ -176,24 +176,27 @@ def _parse_google_results(items: List[Dict], startup_name: str) -> Optional[Dict
 
         if name_match:
             candidate = name_match.group(1).strip()
-            if len(candidate) > 5 and " " in candidate and candidate.lower() != startup_name.lower():
+            if (len(candidate) > 5 and " " in candidate 
+                and candidate.lower() != startup_name.lower()
+                and not re.search(r'\d', candidate)):
                 found_name = candidate
 
         email_match = re.search(r'[\w.+-]+@[\w-]+\.[\w.-]+', f"{title} {snippet}")
         if email_match:
             found_email = email_match.group(0)
 
-        if "linkedin.com/in/" in url:
-            linkedin_name = url.split("linkedin.com/in/")[-1].split("/")[0].split("?")[0]
-            linkedin_name = linkedin_name.replace("-", " ").replace("_", " ").title()
-            if not found_name:
-                found_name = linkedin_name
+        if "linkedin.com/in/" in url and not found_name:
+            li_raw = url.split("linkedin.com/in/")[-1].split("/")[0].split("?")[0]
+            li_name = li_raw.replace("-", " ").replace("_", " ").title()
+            li_name = re.sub(r'\s*\d+\s*', '', li_name).strip()
+            if " " in li_name and len(li_name) > 5:
+                found_name = li_name
 
         if "crunchbase.com" in url and not found_name:
-            import re as _re2
-            cb_name = _re2.search(r"crunchbase\.com/(?:organization|person)/([^/#?]+)", url)
+            cb_name = re.search(r"crunchbase\.com/(?:organization|person)/([^/#?]+)", url)
             if cb_name:
                 parsed = cb_name.group(1).replace("-", " ").replace("_", " ").title()
+                parsed = re.sub(r'\s*\d+\s*', '', parsed).strip()
                 if len(parsed) > 5 and " " in parsed:
                     found_name = parsed
 
