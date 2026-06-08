@@ -56,43 +56,56 @@ def _search_apify(startup: Dict[str, str], cfg) -> Dict[str, Optional[str]]:
 
 
 def _run_google_search(query: str, cfg) -> Optional[Dict[str, Optional[str]]]:
+    log.info(f"Apify: starting search for '{query}'")
     queries = f'"{query}" founder\n"{query}" linkedin\n"{query}" crunchbase'
-    resp = requests.post(
-        f"{APIFY_BASE}/acts/{GOOGLE_SEARCH_ACTOR}/runs",
-        headers={"Authorization": f"Bearer {cfg.apify_api_key}", "Content-Type": "application/json"},
-        json={
-            "queries": queries,
-            "maxPagesPerQuery": 1,
-            "resultsPerPage": 5,
-            "countryCode": "US",
-            "languageCode": "en",
-        },
-        timeout=60,
-    )
+    try:
+        resp = requests.post(
+            f"{APIFY_BASE}/acts/{GOOGLE_SEARCH_ACTOR}/runs",
+            headers={"Authorization": f"Bearer {cfg.apify_api_key}", "Content-Type": "application/json"},
+            json={
+                "queries": queries,
+                "maxPagesPerQuery": 1,
+                "resultsPerPage": 5,
+                "countryCode": "US",
+                "languageCode": "en",
+            },
+            timeout=30,
+        )
+    except Exception as e:
+        log.info(f"Apify POST failed: {e}")
+        return None
+
     if resp.status_code != 201:
-        log.debug(f"Apify run start failed: {resp.status_code}")
+        log.info(f"Apify run start failed: {resp.status_code} {resp.text[:100]}")
         return None
 
     run_id = resp.json()["data"]["id"]
-    log.debug(f"Apify run {run_id} started for: {query}")
+    log.info(f"Apify: run {run_id} started for '{query}'")
 
     dataset_id = None
-    for _ in range(30):
+    for attempt in range(25):
         time.sleep(2)
-        status_resp = requests.get(
-            f"{APIFY_BASE}/acts/{GOOGLE_SEARCH_ACTOR}/runs/{run_id}",
-            headers={"Authorization": f"Bearer {cfg.apify_api_key}"},
-        )
-        if status_resp.status_code != 200:
+        try:
+            status_resp = requests.get(
+                f"{APIFY_BASE}/acts/{GOOGLE_SEARCH_ACTOR}/runs/{run_id}",
+                headers={"Authorization": f"Bearer {cfg.apify_api_key}"},
+                timeout=15,
+            )
+            if status_resp.status_code != 200:
+                log.info(f"Apify status poll {attempt}: {status_resp.status_code}")
+                continue
+            data = status_resp.json()["data"]
+            status = data["status"]
+            if status == "SUCCEEDED":
+                dataset_id = data.get("defaultDatasetId")
+                log.info(f"Apify: run SUCCEEDED (dataset: {dataset_id})")
+                break
+            if status in ("FAILED", "ABORTED", "TIMED-OUT"):
+                log.info(f"Apify run {run_id} {status}: {data.get('errorMessage','')}")
+                return None
+        except Exception as e:
+            log.info(f"Apify status poll error: {e}")
             continue
-        data = status_resp.json()["data"]
-        status = data["status"]
-        if status == "SUCCEEDED":
-            dataset_id = data.get("defaultDatasetId")
-            break
-        if status in ("FAILED", "ABORTED", "TIMED-OUT"):
-            log.info(f"Apify run {run_id} {status}: {data.get('errorMessage','')}")
-            return None
     else:
         log.info(f"Apify run {run_id} timed out waiting")
         return None
