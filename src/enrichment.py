@@ -17,7 +17,7 @@ def enrich_startups(startups: List[Dict[str, str]], cfg) -> List[Dict[str, Optio
         result = enrich_single(startup, cfg)
         enriched.append(result)
         if len(startups) > 1:
-            time.sleep(0.5)
+            time.sleep(1)
 
     log.info(f"Enriched {sum(1 for e in enriched if e.get('founder_name'))}/{len(enriched)} startups")
     return enriched
@@ -26,38 +26,91 @@ def enrich_startups(startups: List[Dict[str, str]], cfg) -> List[Dict[str, Optio
 def enrich_single(startup: Dict[str, str], cfg) -> Dict[str, Optional[str]]:
     domain = urlparse(startup.get("url", "")).netloc or ""
     if not domain:
+        log.debug(f"No domain for {startup.get('name')}, trying name search")
+        return _search_by_name(startup, cfg)
+
+    return _search_by_domain(startup, domain, cfg)
+
+
+def _search_by_domain(startup: Dict[str, str], domain: str, cfg) -> Dict[str, Optional[str]]:
+    try:
+        resp = requests.post(
+            "https://api.apollo.io/api/v1/people/match",
+            headers={
+                "Content-Type": "application/json",
+                "Cache-Control": "no-cache",
+                "X-Api-Key": cfg.apollo_api_key,
+            },
+            json={"domain": domain},
+            timeout=30,
+        )
+        if resp.status_code == 403:
+            log.warning(f"Apollo 403 for {domain} — check API key")
+            return {**startup, "founder_name": None, "founder_email": None}
+        if resp.status_code == 429:
+            log.warning(f"Apollo rate limited for {domain}")
+            return {**startup, "founder_name": None, "founder_email": None}
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        log.debug(f"Apollo API error for {domain}: {e}")
+        return {**startup, "founder_name": None, "founder_email": None}
+
+    person = data.get("person") or (data.get("people", [{}])[0] if data.get("people") else None)
+    if not person:
+        log.debug(f"No person found at {domain}")
+        return _search_by_name(startup, cfg)
+
+    name = person.get("name") or ""
+    if not name:
+        name = (person.get("first_name", "") + " " + person.get("last_name", "")).strip()
+    name = name or None
+    email = person.get("email") or None
+
+    if name:
+        log.info(f"  Found: {name} ({email or 'no email'}) @ {domain}")
+    return {**startup, "founder_name": name, "founder_email": email}
+
+
+def _search_by_name(startup: Dict[str, str], cfg) -> Dict[str, Optional[str]]:
+    name = startup.get("name", "")
+    if not name:
         return {**startup, "founder_name": None, "founder_email": None}
 
     try:
         resp = requests.post(
-            "https://api.apollo.io/v1/people/match",
+            "https://api.apollo.io/api/v1/mixed_people/search",
             headers={
                 "Content-Type": "application/json",
                 "Cache-Control": "no-cache",
                 "X-Api-Key": cfg.apollo_api_key,
             },
             json={
-                "domain": domain,
-                "reveal_personal_emails": True,
-                "reveal_phone": False,
+                "q_organization_name": name,
+                "page": 1,
+                "per_page": 3,
             },
             timeout=30,
         )
+        if resp.status_code in (403, 429):
+            return {**startup, "founder_name": None, "founder_email": None}
+        resp.raise_for_status()
         data = resp.json()
     except Exception as e:
-        log.debug(f"Apollo API error for {domain}: {e}")
+        log.debug(f"Apollo name search error for {name}: {e}")
         return {**startup, "founder_name": None, "founder_email": None}
 
-    person = data.get("person") or data.get("people", [{}])[0] if data.get("people") else None
-    if not person:
+    people = data.get("people") or data.get("contacts") or []
+    if not people:
+        log.debug(f"No Apollo results for {name}")
         return {**startup, "founder_name": None, "founder_email": None}
 
-    name = person.get("name") or person.get("first_name", "") + " " + person.get("last_name", "")
-    name = name.strip() or None
-    email = person.get("email") or person.get("personal_email") or None
+    person = people[0]
+    person_name = person.get("name") or ""
+    if not person_name:
+        person_name = (person.get("first_name", "") + " " + person.get("last_name", "")).strip()
+    email = person.get("email") or None
 
-    return {
-        **startup,
-        "founder_name": name,
-        "founder_email": email,
-    }
+    if person_name:
+        log.info(f"  Found (name search): {person_name} ({email or 'no email'}) @ {name}")
+    return {**startup, "founder_name": person_name or None, "founder_email": email}
