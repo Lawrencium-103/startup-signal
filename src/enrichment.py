@@ -56,18 +56,18 @@ def _search_apify(startup: Dict[str, str], cfg) -> Dict[str, Optional[str]]:
 
 
 def _run_google_search(query: str, cfg) -> Optional[Dict[str, Optional[str]]]:
-    query_founder = f'"{query}" founder'
+    queries = f'"{query}" founder\n"{query}" linkedin\n"{query}" crunchbase'
     resp = requests.post(
         f"{APIFY_BASE}/acts/{GOOGLE_SEARCH_ACTOR}/runs",
         headers={"Authorization": f"Bearer {cfg.apify_api_key}", "Content-Type": "application/json"},
         json={
-            "queries": query_founder,
+            "queries": queries,
             "maxPagesPerQuery": 1,
             "resultsPerPage": 5,
             "countryCode": "US",
             "languageCode": "en",
         },
-        timeout=30,
+        timeout=60,
     )
     if resp.status_code != 201:
         log.debug(f"Apify run start failed: {resp.status_code}")
@@ -99,35 +99,60 @@ def _run_google_search(query: str, cfg) -> Optional[Dict[str, Optional[str]]]:
         headers={"Authorization": f"Bearer {cfg.apify_api_key}"},
     )
     if dataset_resp.status_code != 200:
+        log.debug(f"Apify dataset fetch failed: {dataset_resp.status_code}")
         return None
 
     items = dataset_resp.json()
-    return _parse_google_results(items, query)
+    if not items:
+        log.debug(f"Apify: empty dataset for {query}")
+        return None
+
+    result = _parse_google_results(items, query)
+    if not result:
+        log.debug(f"Apify: no founder parsed for {query} (got {len(items)} result items)")
+    return result
 
 
 def _parse_google_results(items: List[Dict], startup_name: str) -> Optional[Dict[str, Optional[str]]]:
     found_name = None
     found_email = None
 
+    results = []
     for item in items:
-        title = item.get("title", "")
-        snippet = item.get("text", "") or item.get("description", "") or ""
-        url = item.get("url", "") or ""
+        raw = item.get("organicResults") or item.get("results") or item.get("items") or []
+        if raw:
+            results.extend(raw)
+        else:
+            results.append(item)
+
+    log.debug(f"Parsing {len(results)} search results for {startup_name}")
+    if not results and items:
+        log.debug(f"Raw item keys: {list(items[0].keys())[:10]}")
+
+    for r in results:
+        title = r.get("title", "")
+        snippet = r.get("text", "") or r.get("description", "") or r.get("snippet", "") or ""
+        url = r.get("url", "") or r.get("link", "") or ""
         combined = f"{title} {snippet}".lower()
 
         name_match = re.search(
-            r"(?:founder|co-founder|ceo|president)\s*[:\-–]\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})",
+            r"(?:founder|co-founder|ceo|president|owner)\s*[:\-–•·]\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})",
             f"{title} {snippet}"
         )
         if not name_match:
             name_match = re.search(
-                r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\s*[:\-–]\s*(?:founder|co-founder|ceo)",
+                r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\s*[:\-–•·]\s*(?:founder|co-founder|ceo|president)",
                 f"{title} {snippet}"
+            )
+        if not name_match:
+            name_match = re.search(
+                r"(?:by|from)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\s*[|\-–]",
+                f"{title}"
             )
 
         if name_match:
             candidate = name_match.group(1).strip()
-            if len(candidate) > 5 and " " in candidate:
+            if len(candidate) > 5 and " " in candidate and candidate.lower() != startup_name.lower():
                 found_name = candidate
 
         email_match = re.search(r'[\w.+-]+@[\w-]+\.[\w.-]+', f"{title} {snippet}")
@@ -140,14 +165,19 @@ def _parse_google_results(items: List[Dict], startup_name: str) -> Optional[Dict
             if not found_name:
                 found_name = linkedin_name
 
-        if "linkedin.com" in url and "founder" in combined:
-            if not found_name:
-                pass
+        if "crunchbase.com" in url and not found_name:
+            import re as _re2
+            cb_name = _re2.search(r"crunchbase\.com/(?:organization|person)/([^/#?]+)", url)
+            if cb_name:
+                parsed = cb_name.group(1).replace("-", " ").replace("_", " ").title()
+                if len(parsed) > 5 and " " in parsed:
+                    found_name = parsed
 
     if found_name:
         log.info(f"  Apify found: {found_name} ({found_email or 'no email'})")
         return {"founder_name": found_name, "founder_email": found_email}
 
+    log.debug(f"Apify: no founder found for {startup_name}")
     return None
 
 
