@@ -11,20 +11,6 @@ log = logging.getLogger(__name__)
 APIFY_BASE = "https://api.apify.com/v2"
 GOOGLE_SEARCH_ACTOR = "apify~google-search-scraper"
 
-_DEBUGGED = False
-def _debug_env():
-    global _DEBUGGED
-    if _DEBUGGED:
-        return
-    _DEBUGGED = True
-    import sys, platform
-    log.info(f"Python {sys.version} | requests {requests.__version__} | {platform.platform()}")
-    try:
-        r = requests.get("https://api.apify.com/v2", timeout=10)
-        log.info(f"Apify root: {r.status_code} {r.text[:80]}")
-    except Exception as e:
-        log.info(f"Apify root fail: {e}")
-
 
 def enrich_startups(startups: List[Dict[str, str]], cfg) -> List[Dict[str, Optional[str]]]:
     enriched = []
@@ -56,7 +42,6 @@ def enrich_single(startup: Dict[str, str], cfg) -> Dict[str, Optional[str]]:
 
 
 def _search_apify(startup: Dict[str, str], cfg) -> Dict[str, Optional[str]]:
-    _debug_env()
     name = startup.get("name", "")
     log.info(f"Searching Apify for {name}")
 
@@ -73,28 +58,23 @@ def _search_apify(startup: Dict[str, str], cfg) -> Dict[str, Optional[str]]:
 def _run_google_search(query: str, cfg) -> Optional[Dict[str, Optional[str]]]:
     log.info(f"Apify: starting search for '{query}'")
     queries = f'"{query}" founder\n"{query}" linkedin\n"{query}" crunchbase'
-    payload = {
-        "queries": queries,
-        "maxPagesPerQuery": 1,
-        "resultsPerPage": 5,
-        "countryCode": "US",
-        "languageCode": "en",
-    }
-    url = f"{APIFY_BASE}/acts/{GOOGLE_SEARCH_ACTOR}/runs"
-    log.info(f"Apify URL: {url}")
-    log.info(f"Apify payload: {json.dumps(payload)[:200]}")
     try:
         resp = requests.post(
-            url,
+            f"{APIFY_BASE}/acts/{GOOGLE_SEARCH_ACTOR}/runs",
             headers={"Authorization": f"Bearer {cfg.apify_api_key}", "Content-Type": "application/json"},
-            data=json.dumps(payload),
+            json={
+                "queries": queries,
+                "maxPagesPerQuery": 1,
+                "resultsPerPage": 5,
+                "countryCode": "us",
+                "languageCode": "en",
+            },
             timeout=30,
         )
     except Exception as e:
         log.info(f"Apify POST failed: {e}")
         return None
 
-    log.info(f"Apify response: {resp.status_code} headers={dict(resp.headers)} body={resp.text[:500]}")
     if resp.status_code != 201:
         log.info(f"Apify run start failed ({resp.status_code}): {resp.text[:500]}")
         return None
