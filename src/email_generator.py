@@ -15,7 +15,7 @@ def generate_emails(startups: List[Dict]) -> List[Dict]:
 def _generate_single(startup: Dict) -> str:
     founder = startup.get("founder_name") or "there"
     name = startup.get("name", "your startup")
-    need = startup.get("critical_need", "scale operations")
+    need = startup.get("critical_need") or "scale operations"
 
     first_name = founder.split()[0] if founder and founder != "there" else "there"
 
