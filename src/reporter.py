@@ -1,5 +1,6 @@
 import logging
 import smtplib
+from datetime import date
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import List, Dict
@@ -83,6 +84,7 @@ def build_html_report(top_startups: List[Dict], all_startups: List[Dict] = None)
 <head><meta charset="utf-8"></head>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:960px;margin:0 auto;padding:20px;">
     <h1 style="color:#111;">Startup Signal</h1>
+    <p style="color:#999;font-size:14px;">{date.today().isoformat()}</p>
     <p style="color:#666;">Top {len(top_startups)} matches for your skills today</p>
     <table style="width:100%;border-collapse:collapse;margin-top:16px;">
         <thead>
@@ -121,7 +123,7 @@ def send_report(startups: List[Dict], cfg, all_startups: List[Dict] = None) -> b
     msg = MIMEMultipart("alternative")
     msg["From"] = cfg.email_from
     msg["To"] = cfg.email_to
-    msg["Subject"] = f"Startup Signal — Top {len(startups)} matches today"
+    msg["Subject"] = f"Startup Signal — {date.today().isoformat()} — Top {len(startups)} matches"
 
     msg.attach(MIMEText(f"Startup Signal found {len(startups)} top matches today. Open in HTML for full report.", "plain"))
     msg.attach(MIMEText(html, "html"))
