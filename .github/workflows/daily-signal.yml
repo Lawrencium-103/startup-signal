@@ -45,10 +45,10 @@ jobs:
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
           APIFY_API_KEY: ${{ secrets.APIFY_API_KEY }}
           APOLLO_API_KEY: ${{ secrets.APOLLO_API_KEY }}
-           PRODUCTHUNT_API_KEY: ${{ secrets.PRODUCTHUNT_API_KEY }}
-           CRUNCHBASE_API_KEY: ${{ secrets.CRUNCHBASE_API_KEY }}
-           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-         run: python run.py
+          PRODUCTHUNT_API_KEY: ${{ secrets.PRODUCTHUNT_API_KEY }}
+          CRUNCHBASE_API_KEY: ${{ secrets.CRUNCHBASE_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python run.py
 
       - name: Upload HTML report as artifact
         uses: actions/upload-artifact@v4
