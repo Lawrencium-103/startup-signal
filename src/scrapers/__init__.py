@@ -9,15 +9,14 @@ from urllib.parse import urlparse
 log = logging.getLogger(__name__)
 
 SCRAPERS = [
-    ("YC Launches", "src.scrapers.yc_launches"),
+    ("YC API", "src.scrapers.yc_launches"),
     ("Product Hunt", "src.scrapers.product_hunt"),
     ("BetaList", "src.scrapers.betalist"),
     ("TechCrunch", "src.scrapers.techcrunch"),
     ("a16z Portfolio", "src.scrapers.a16z_portfolio"),
-    ("Wellfound", "src.scrapers.wellfound"),
     ("Reddit r/startups", "src.scrapers.reddit_startups"),
+    ("Indie Hackers", "src.scrapers.indie_hackers"),
     ("Crunchbase", "src.scrapers.crunchbase"),
-    ("Startup Gallery", "src.scrapers.startup_gallery"),
 ]
 
 TODAY = date.today().isoformat()
